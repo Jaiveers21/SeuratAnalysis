@@ -1,0 +1,232 @@
+---
+title: "1monthmale"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r cars}
+suppressMessages(library(Seurat))
+suppressMessages(library(dplyr))
+suppressMessages(library(org.Mm.eg.db))
+suppressMessages(library(biomaRt))
+suppressMessages(library(clusterProfiler))
+suppressMessages(library(SingleR))
+```
+
+```{r pressure, echo=FALSE}
+object1.data <- Read10X(data.dir = "/Users/brucewanglab/Documents/scRNAseq_data/Maca_filtered/10X_P5_0_filtered")
+object1 <- CreateSeuratObject(counts = object1.data, min.cells = 3, min.features = 0, project = "mouse1")
+
+object2.data <- Read10X(data.dir = "/Users/brucewanglab/Documents/scRNAseq_data/Maca_filtered/10X_P5_1_filtered")
+object2 <- CreateSeuratObject(counts = object2.data, min.cells = 3, min.features = 0, project = "mouse2")
+
+Pliver <- merge(x = object1, y = object2, add.cell.ids = c("mouse1", "mouse2"))
+```
+
+```{r}
+mice.list <- c(object1, object2)
+```
+
+```{r}
+for (i in 1:length(mice.list)) {
+    mice.list[[i]] <- NormalizeData(mice.list[[i]], verbose = FALSE)
+    mice.list[[i]] <- FindVariableFeatures(mice.list[[i]], selection.method = "vst", nfeatures = 2000, 
+        verbose = FALSE)
+}
+```
+
+```{r}
+mice.anchors <- FindIntegrationAnchors(object.list = mice.list, dims = 1:30)
+```
+
+```{r}
+mice.integrated <- IntegrateData(anchorset = mice.anchors, dims = 1:30)
+```
+
+```{r}
+print(paste("Avg nGene:", mean(mice.integrated$nFeature_RNA), sep = " "))
+print(paste("Avg nUMI:", mean(mice.integrated$nCount_RNA), sep = " "))
+```
+
+```{r}
+plot2 <- FeatureScatter(object = mice.integrated, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+plot(plot2)
+```
+
+```{r}
+VlnPlot(object = mice.integrated, features = c("nFeature_RNA", "nCount_RNA"), ncol = 3)
+```
+
+```{r}
+mice.integrated <- subset(x = mice.integrated, subset = nFeature_RNA > 100 & nFeature_RNA < 5000 & nCount_RNA > 200 & nCount_RNA < 30000)
+```
+
+
+```{r}
+all.genes <- rownames(x = mice.integrated)
+mice.integrated <- ScaleData(object = mice.integrated, features = all.genes)
+```
+
+```{r}
+mice.integrated <- RunPCA(mice.integrated, features = VariableFeatures(object = mice.integrated))
+```
+
+```{r}
+#TODO: Set sub.n.pcs to number of PCs you wish to use.
+sub_n_pcs = 10
+
+#TODO: Set resolution 
+sub_res <- 0.3
+
+mice.integrated <- FindNeighbors(mice.integrated, dims = 1:sub_n_pcs)
+mice.integrated <- FindClusters(mice.integrated, resolution = sub_res)
+```
+
+```{r}
+mice.integrated <- RunUMAP(mice.integrated, dims = 1:sub_n_pcs)
+DimPlot(mice.integrated, reduction = "umap")
+```
+
+```{r}
+DimPlot(mice.integrated, reduction = "umap", group.by = "orig.ident")
+```
+
+```{r}
+genes_hep = c('Alb', 'Ttr', 'Apoa1', 'Serpina1c', 
+                   'Cyp2e1', 'Glul', 'Slc1a2', 'Oat', 'Gulo',
+                   'Ass1', 'Hamp', 'Gstp1', 'Ubb',
+                   'Cyp2f2', 'Pck1', 'Hal', 'Cdh1', 'Cps1')
+genes_endo = c('Pecam1', 'Nrp1', 'Kdr','Oit3', 'Flt4')
+genes_stellate = c('Dcn','Col1a2', 'Bgn')
+genes_kuppfer = c('Clec4f', 'Cd68', 'Irf7')
+genes_nk = c('Zap70', 'Il2rb', 'Nkg7','Cxcr6', 'Gzma', 'Klrb1c')
+genes_b = c('Cd79a','Cd79b', 'Cd74')
+genes_bec = c('Epcam', 'Krt19', 'Krt7', 'Spp1', 'Sox9')
+genes_immune = 'Ptprc'
+genes_neutrophil = c('Csf3r','Csf3r', 'Cxcr2')
+genes_pDC = c('Siglech', 'Bst2', 'Ly6c2', 'Tlr7', 'Itgax', 'Irf8')
+genes_monocyte = c("Itgam", "Csf1r", "Ly6c2","Cx3cr1", "Ccr2", "Cd14")
+
+all_genes = c(genes_endo, genes_kuppfer, genes_nk, genes_b, genes_bec, genes_immune, genes_stellate)
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+VlnPlot(mice.integrated, features = genes_hep)
+```
+
+```{r}
+mice.integrated <- SubsetData(object = mice.integrated, ident.remove = c(4, 5))
+```
+
+```{r}
+mice.integrated <- FindVariableFeatures(object = mice.integrated, selection.method = "vst", nfeatures = 2000)
+```
+
+```{r}
+all.genes <- rownames(x = mice.integrated)
+mice.integrated <- ScaleData(object = mice.integrated, features = all.genes)
+```
+
+```{r}
+mice.integrated <- RunPCA(mice.integrated, features = VariableFeatures(object = mice.integrated))
+```
+
+```{r}
+#TODO: Set sub.n.pcs to number of PCs you wish to use.
+sub_n_pcs = 10
+
+#TODO: Set resolution 
+sub_res <- 0.6
+
+mice.integrated <- FindNeighbors(mice.integrated, dims = 1:sub_n_pcs)
+mice.integrated <- FindClusters(mice.integrated, resolution = sub_res)
+```
+
+```{r}
+mice.integrated <- RunUMAP(mice.integrated, dims = 1:sub_n_pcs)
+DimPlot(mice.integrated, reduction = "umap")
+```
+
+```{r}
+DimPlot(mice.integrated, reduction = "umap", group.by = "orig.ident")
+```
+
+```{r}
+mice.integrated <- RunTSNE(object = mice.integrated, dims.use = 1:sub_n_pcs, seed.use = 10)
+```
+
+```{r}
+TSNEPlot(object = mice.integrated, do.label = TRUE)
+```
+
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+# Plot immediate pericentral markers
+VlnPlot(object = mice.integrated, features = c("Glul", "Slc1a2"))
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+# Plot pericentral markers
+VlnPlot(object = mice.integrated, features = c("Cyp2e1", "Glul", "Oat", "Gulo"))
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+# Plot periportal markers
+VlnPlot(object = mice.integrated, features = c("Cyp2f2", "Pck1", "Hal", "Cdh1"))
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+# Plot midlobular markers
+VlnPlot(object = mice.integrated, features = c("Ass1", "Hamp", "Gstp1", "Ubb"))
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+FeaturePlot(object = mice.integrated, features = c("Cyp2f2", "Pck1", "Hal", "Cdh1"))
+```
+
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+FeaturePlot(object = mice.integrated, features = c("Cyp2e1", "Glul", "Oat", "Gulo"))
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+FeaturePlot(object = mice.integrated, features = c("Glul", "Slc1a2"))
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+FeaturePlot(object = mice.integrated, features = c("Ass1", "Hamp", "Gstp1", "Ubb"))
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+FeaturePlot(object = mice.integrated, features = c("nFeature_RNA", "nCount_RNA"))
+```
+
+```{r}
+mice.integrated <- RenameIdents(object = mice.integrated, "0" = "periportal cells")
+mice.integrated <- RenameIdents(object = mice.integrated, "1" = "unknown")
+mice.integrated <- RenameIdents(object = mice.integrated, "2" = "pericentral cells")
+mice.integrated <- RenameIdents(object = mice.integrated, "3" = "periportal cells")
+mice.integrated <- RenameIdents(object = mice.integrated, "4" = "pericentral cells")
+mice.integrated <- RenameIdents(object = mice.integrated, "5" = "pericentral cells")
+mice.integrated <- RenameIdents(object = mice.integrated, "6" = "periportal cells")
+mice.integrated <- RenameIdents(object = mice.integrated, "7" = "immediate pericentral cells")
+mice.integrated <- RenameIdents(object = mice.integrated, "8" = "unknown")
+```
+
+
+```{r}
+DimPlot(mice.integrated, reduction = "umap")
+```
+
+```{r}
+save(mice.integrated, file = "/Users/brucewanglab/Documents/Jaiveer/1\ month\1monthmale.Robj")
+```
+
+```{r}
+
+```
+

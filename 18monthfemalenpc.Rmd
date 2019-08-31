@@ -1,0 +1,296 @@
+---
+title: "18monthfemalenpc"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r cars}
+suppressMessages(library(Seurat))
+suppressMessages(library(dplyr))
+suppressMessages(library(org.Mm.eg.db))
+suppressMessages(library(biomaRt))
+suppressMessages(library(clusterProfiler))
+suppressMessages(library(SingleR))
+```
+
+```{r pressure, echo=FALSE}
+object.data <- Read10X_h5(filename = "/Users/brucewanglab/Documents/scRNAseq_data/Maca_raw/MACA_18m_F_LIVER_NPC_51/filtered_gene_bc_matrices_h5.h5")
+mouse2 <- CreateSeuratObject(counts = object.data, min.cells = 3, min.features = 0, project = "18 month female")
+```
+
+```{r}
+mouse2
+print(paste("Avg nGene:", mean(mouse2$nFeature_RNA), sep = " "))
+print(paste("Avg nUMI:", mean(mouse2$nCount_RNA), sep = " "))
+```
+
+```{r}
+mouse2[["percent.mt"]] <- PercentageFeatureSet(object = mouse2, pattern = "^mt-")
+plot1 <- FeatureScatter(object = mouse2, feature1 = "nCount_RNA", feature2 = "percent.mt")
+plot2 <- FeatureScatter(object = mouse2, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+CombinePlots(plots = list(plot1, plot2))
+```
+
+```{r}
+VlnPlot(object = mouse2, features = c("nFeature_RNA", "nCount_RNA"), ncol = 3)
+```
+
+```{r}
+mouse2 <- subset(x = mouse2, subset = nFeature_RNA > 500 & nFeature_RNA < 3500 & nCount_RNA > 200 & nCount_RNA < 15000)
+```
+
+```{r}
+mouse2
+print(paste("Avg nGene:", mean(mouse2$nFeature_RNA), sep = " "))
+print(paste("Avg nUMI:", mean(mouse2$nCount_RNA), sep = " "))
+```
+
+```{r}
+mouse2 <- NormalizeData(object = mouse2, normalization.method = "LogNormalize", scale.factor = 10000)
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+
+mouse2 <- FindVariableFeatures(object = mouse2, selection.method = "vst", nfeatures = 2000)
+
+
+top10 <- head(x = VariableFeatures(object = mouse2), 10)
+
+
+plot1 <- VariableFeaturePlot(object = mouse2)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+CombinePlots(plots = list(plot1, plot2))
+```
+
+```{r}
+all.genes <- rownames(x = mouse2)
+mouse2 <- ScaleData(object = mouse2, features = all.genes) #vars.to.regress = "orig.ident")
+```
+
+```{r}
+mouse2 <- RunPCA(mouse2, features = VariableFeatures(object = mouse2))
+```
+
+```{r}
+DimPlot(mouse2, reduction = "pca")
+```
+
+```{r}
+ElbowPlot(mouse2)
+```
+
+```{r}
+n_pcs <- 15
+
+
+res <- 0.3
+
+mouse2 <- FindNeighbors(mouse2, dims = 1:n_pcs)
+mouse2 <- FindClusters(mouse2, resolution = res)
+```
+
+```{r}
+mouse2 <- RunUMAP(mouse2, dims = 1:n_pcs)
+DimPlot(mouse2, reduction = "umap")
+```
+
+```{r}
+genes_hep = c('Alb', 'Ttr', 'Apoa1', 'Serpina1c', 
+                   'Cyp2e1', 'Glul', 'Slc1a2', 'Oat', 'Gulo',
+                   'Ass1', 'Hamp', 'Gstp1', 'Ubb',
+                   'Cyp2f2', 'Pck1', 'Hal', 'Cdh1', 'Cps1')
+genes_endo = c('Pecam1', 'Nrp1', 'Kdr','Oit3', 'Flt4')
+genes_stellate = c('Dcn','Col1a2', 'Bgn')
+genes_kuppfer = c('Clec4f', 'Cd68', 'Irf7')
+genes_nk = c('Zap70', 'Il2rb', 'Nkg7','Cxcr6', 'Gzma', 'Klrb1c')
+genes_b = c('Cd79a','Cd79b', 'Cd74')
+genes_bec = c('Epcam', 'Krt19', 'Krt7', 'Spp1', 'Sox9')
+genes_immune = 'Ptprc'
+genes_neutrophil = c('Csf3r','Csf3r', 'Cxcr2')
+genes_pDC = c('Siglech', 'Bst2', 'Ly6c2', 'Tlr7', 'Itgax', 'Irf8')
+genes_monocyte = c("Itgam", "Csf1r", "Ly6c2","Cx3cr1", "Ccr2", "Cd14")
+
+all_genes = c(genes_endo, genes_kuppfer, genes_nk, genes_b, genes_bec, genes_immune, genes_stellate)
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+VlnPlot(mouse2, features = genes_hep)
+```
+
+```{r}
+nonhep2 <- SubsetData(object = mouse2, ident.remove = c(6,7))
+```
+
+```{r}
+nonhep2
+print(paste("Avg nGene:", mean(nonhep2$nFeature_RNA), sep = " "))
+print(paste("Avg nUMI:", mean(nonhep2$nCount_RNA), sep = " "))
+```
+
+```{r}
+VlnPlot(object = nonhep2, features = c("nFeature_RNA", "nCount_RNA"), ncol = 3)
+```
+
+```{r, echo=FALSE, fig.height=3, fig.width=10}
+FeaturePlot(object = nonhep2, features = c("nFeature_RNA", "nCount_RNA"), ncol = 3)
+```
+
+```{r}
+nonhep2 <- FindVariableFeatures(object = nonhep2, selection.method = "vst", nfeatures = 2000)
+```
+
+```{r}
+all.genes <- rownames(x = nonhep2)
+nonhep2 <- ScaleData(object = nonhep2, features = all.genes)#, vars.to.regress = "orig.ident")
+```
+
+```{r}
+nonhep2 <- RunPCA(nonhep2, features = VariableFeatures(object = nonhep2))
+```
+
+```{r}
+DimPlot(nonhep2, reduction = "pca")
+```
+
+```{r}
+ElbowPlot(nonhep2)
+```
+
+```{r}
+#TODO: Set sub.n.pcs to number of PCs you wish to use.
+sub_n_pcs = 10
+
+#TODO: Set resolution 
+sub_res <- 0.4
+
+nonhep2 <- FindNeighbors(nonhep2, dims = 1:sub_n_pcs)
+nonhep2 <- FindClusters(nonhep2, resolution = sub_res)
+```
+
+```{r}
+nonhep2 <- RunUMAP(nonhep2, dims = 1:sub_n_pcs)
+DimPlot(nonhep2, reduction = "umap")
+```
+
+```{r}
+nonhep2 <- RunTSNE(object = nonhep2, dims.use = 1:sub_n_pcs, seed.use = 10)
+```
+
+```{r}
+TSNEPlot(object = nonhep2, do.label = TRUE)
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+VlnPlot(object = nonhep2, features = genes_endo)
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+VlnPlot(object = nonhep2, features = genes_stellate)
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+VlnPlot(object = nonhep2, features = genes_kuppfer)
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+VlnPlot(object = nonhep2, features = genes_nk)
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+VlnPlot(object = nonhep2, features = genes_b)
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+VlnPlot(object = nonhep2, features = genes_bec)
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+VlnPlot(object = nonhep2, features = c("Bpgm", "Gypa"))
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+VlnPlot(object = nonhep2, features = genes_pDC)
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+VlnPlot(object = nonhep2, features = genes_monocyte)
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+VlnPlot(object = nonhep2, features = genes_neutrophil)
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+FeaturePlot(object = nonhep2, features = c("nFeature_RNA", "nCount_RNA"))
+```
+
+```{r}
+nonhep2 <- RenameIdents(object = nonhep2, "0" = "kuppfer cells")
+nonhep2 <- RenameIdents(object = nonhep2, "1" = "nk cells")
+nonhep2 <- RenameIdents(object = nonhep2, "2" = "b cells")
+nonhep2 <- RenameIdents(object = nonhep2, "3" = "kuppfer cells")
+nonhep2 <- RenameIdents(object = nonhep2, "4" = "pDC?")
+nonhep2 <- RenameIdents(object = nonhep2, "5" = "endothelial cells")
+```
+
+```{r}
+nonhep2 <- RenameIdents(object = nonhep2, "pDC?" = "monocytes?")
+```
+
+```{r}
+DimPlot(nonhep2, reduction = "umap")
+```
+
+
+```{r, echo=FALSE, fig.height=5, fig.width=10}
+FeaturePlot(object = nonhep2, features = genes_b)
+```
+
+
+```{r}
+save(nonhep2, file = "/Users/brucewanglab/Documents/Jaiveer/18month\18monthfemalenpc.Robj")
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
